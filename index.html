@@ -32,7 +32,7 @@
         try {
           const saved = localStorage.getItem('mc_run_history');
           return saved ? JSON.parse(saved) : [];
-        } catch (e){
+        } catch (e) {
           return [];
         }
       };
@@ -88,6 +88,7 @@
         return runs.sort((a, b) => a - b);
       };
 
+      // Find allocation percentage needed to finish in t sprints at given confidence
       const findPctForTarget = (est, vels, t, alpha = 0.75) => {
         for (let p = 1; p <= 100; p++) {
           const arr = simulate(vels.map(v => v * p / 100), est);
@@ -123,23 +124,28 @@
 
         setResults({ grid, pctData, allResults });
 
-        // Build output text
+        // ---- OUTPUT LOGIC ADAPTED FOR BOTH 75% AND 95% ----
         let txt = '';
         allResults.forEach((arr, i) => {
-          const p75 = arr[Math.floor(0.75 * arr.length)];
-          const p95 = arr[Math.floor(0.95 * arr.length)];
-          const needed = findPctForTarget(estimates[i], vels, t);
-          txt += `Epic ${i+1} (${epics[i].name || `Epic ${i+1}`}):\n`;
-          txt += ` - With 75% certainty, you can expect to complete this epic within ${p75} sprints.\n`;
-          txt += ` - With 95% certainty, you can expect to complete this epic within ${p95} sprints.\n`;
-          if (needed !== null) {
-            txt += ` - Approximately ${needed}% of capacity is required to finish in ${t} sprints (75% confidence).\n`;
-          } else {
-            txt += ` - Over 100% capacity needed to finish in ${t} sprints (75% confidence).\n`;
-          }
+          txt += `Epic "${epics[i].name || `Epic ${i+1}`}"\n\n`;
+          [0.75, 0.95].forEach((conf, idx) => {
+            const label = idx === 0 ? '75%' : '95%';
+            const sprintsNeeded = arr[Math.floor(conf * arr.length)];
+            const alloc = allocationPct[i];
+            const allocNeeded = findPctForTarget(estimates[i], vels, t, conf);
+            txt += `${label} confidence\n`;
+            txt += `- With ${alloc}% resource allocation, you can expect to complete epic "${epics[i].name || `Epic ${i+1}`}" within ${sprintsNeeded} sprints\n`;
+            if (allocNeeded !== null) {
+              txt += `- You would need to allocate ${allocNeeded}% of capacity to finish in ${t} sprints\n`;
+            } else {
+              txt += `- Over 100% capacity needed to finish in ${t} sprints\n`;
+            }
+            txt += `\n`;
+          });
           txt += `\n`;
         });
         setTextOutput(txt.trim());
+        // ---- END OUTPUT LOGIC ----
 
         // Save to history
         const runEntry = {
